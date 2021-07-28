@@ -64,14 +64,13 @@ end
 function response = submitParts(conf, email, token, parts)
   body = makePostBody(conf, email, token, parts);
   submissionUrl = submissionUrl();
-
   responseBody = getResponse(submissionUrl, body);
   jsonResponse = validateResponse(responseBody);
   response = loadjson(jsonResponse);
 end
 
 function body = makePostBody(conf, email, token, parts)
-  bodyStruct.assignmentSlug = conf.assignmentSlug;
+  bodyStruct.assignmentKey = conf.assignmentKey;
   bodyStruct.submitterEmail = email;
   bodyStruct.secret = token;
   bodyStruct.parts = makePartsStruct(conf, parts);
@@ -103,15 +102,17 @@ function showFeedback(parts, response)
   fprintf('== \n');
   fprintf('== %43s | %9s | %-s\n', 'Part Name', 'Score', 'Feedback');
   fprintf('== %43s | %9s | %-s\n', '---------', '-----', '--------');
+
   for part = parts
     score = '';
     partFeedback = '';
-    partFeedback = response.partFeedbacks.(makeValidFieldName(part{:}.id));
-    partEvaluation = response.partEvaluations.(makeValidFieldName(part{:}.id));
+    % NEW PARSING REPONSE BODY
+    partFeedback = response.linked.onDemandProgrammingScriptEvaluations_0x2E_v1{1}(1).parts.(makeValidFieldName(part{:}.id)).feedback;
+    partEvaluation = response.linked.onDemandProgrammingScriptEvaluations_0x2E_v1{1}(1).parts.(makeValidFieldName(part{:}.id));
     score = sprintf('%d / %3d', partEvaluation.score, partEvaluation.maxScore);
     fprintf('== %43s | %9s | %-s\n', part{:}.name, score, partFeedback);
   end
-  evaluation = response.evaluation;
+  evaluation = response.linked.onDemandProgrammingScriptEvaluations_0x2E_v1{1}(1);
   totalScore = sprintf('%d / %d', evaluation.score, evaluation.maxScore);
   fprintf('==                                   --------------------------------\n');
   fprintf('== %43s | %9s | %-s\n', '', totalScore, '');
@@ -120,20 +121,21 @@ end
 
 % use urlread or curl to send submit results to the grader and get a response
 function response = getResponse(url, body)
-% try using urlread() and a secure connection
-  params = {'jsonBody', body};
-  [response, success] = urlread(url, 'post', params);
+  % NEW CURL SUBMISSION FOR WINDOWS AND MAC
+  if ispc
+    new_body = regexprep (body, '\"', '\\"'); % will escape double quoted objects to format properly for windows libcurl
+    json_command = sprintf('curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/json" -d "%s" --ssl-no-revoke "%s"', new_body, url);
+    [code, response] = dos(json_command); %dos is for windows
 
-  if (success == 0)
-    % urlread didn't work, try curl & the peer certificate patch
-    if ispc
-      % testing note: use 'jsonBody =' for a test case
-      json_command = sprintf('echo jsonBody=%s | curl -k -X POST -d @- %s', body, url);
-    else
-      % it's linux/OS X, so use the other form
-      json_command = sprintf('echo ''jsonBody=%s'' | curl -k -X POST -d @- %s', body, url);
+    new_response = regexp(response, '\{(.)*', 'match');
+    response = new_response{1,1};
+
+    % test the success code
+    if (code ~= 0)
+      fprintf('[error] submission with Invoke-WebRequest() was not successful\n');
     end
-    % get the response body for the peer certificate patch method
+  else
+    json_command = sprintf('curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/json" -d '' %s '' --ssl-no-revoke ''%s''', body, url);
     [code, response] = system(json_command);
     % test the success code
     if (code ~= 0)
@@ -175,5 +177,5 @@ end
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function submissionUrl = submissionUrl()
-  submissionUrl = 'https://www-origin.coursera.org/api/onDemandProgrammingImmediateFormSubmissions.v1';
+  submissionUrl = 'https://www.coursera.org/api/onDemandProgrammingScriptSubmissions.v1?includes=evaluation';
 end
