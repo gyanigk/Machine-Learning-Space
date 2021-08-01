@@ -1,0 +1,298 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "5e0c64ee",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import pandas as pd\n",
+    "#import tensorflow as tf\n",
+    "#import keras as K\n",
+    "import csv\n",
+    "from tqdm import tqdm\n",
+    "tqdm.pandas(desc=\"progress-bar\")\n",
+    "from gensim.models import Doc2Vec\n",
+    "from sklearn import utils\n",
+    "from sklearn.linear_model import LogisticRegression\n",
+    "from sklearn.metrics import accuracy_score\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "import gensim\n",
+    "from gensim.models import doc2vec\n",
+    "from gensim.models.doc2vec import TaggedDocument\n",
+    "import re\n",
+    "\n",
+    "%matplotlib inline\n",
+    "\n",
+    "RANDOM_SEED = 69"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "41e872f1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "train_data = pd.read_csv(\"/home/solomon/DataSet/dataset52a7b21/dataset/clean_train.csv\", escapechar = \"\\\\\", quoting = csv.QUOTE_NONE)\n",
+    "test_data = pd.read_csv(\"/home/solomon/DataSet/dataset52a7b21/dataset/test.csv\", escapechar = \"\\\\\", quoting = csv.QUOTE_NONE)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "0f192ea8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def label_sentences(corpus, label_type):\n",
+    "    \"\"\"\n",
+    "    Gensim's Doc2Vec implementation requires each document/paragraph to have a label associated with it.\n",
+    "    We do this by using the TaggedDocument method. The format will be \"TRAIN_i\" or \"TEST_i\" where \"i\" is\n",
+    "    a dummy index of the post.\n",
+    "    \"\"\"\n",
+    "    labeled = []\n",
+    "    for i, v in enumerate(corpus):\n",
+    "        label = label_type + '_' + str(i)\n",
+    "        if(v!=v):\n",
+    "            labeled.append(doc2vec.TaggedDocument(\"\", [label]))\n",
+    "        else:\n",
+    "            labeled.append(doc2vec.TaggedDocument(v.split(), [label]))\n",
+    "    return labeled"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "fda457d4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Training Size:-  2322419\n",
+      "Validation Size:-  580605\n",
+      "Test Size:-  110775\n"
+     ]
+    }
+   ],
+   "source": [
+    "X = train_data[\"TITLE\"].map(str) + \" \" + train_data[\"DESCRIPTION\"].map(str) + \" \" + train_data[\"BULLET_POINTS\"].map(str) + \" \" + train_data[\"BRAND\"]\n",
+    "y = train_data[\"BROWSE_NODE_ID\"]\n",
+    "\n",
+    "X_test = test_data[\"TITLE\"].map(str) + \" \" + test_data[\"DESCRIPTION\"].map(str) + \" \" + test_data[\"BULLET_POINTS\"].map(str) + \" \" + test_data[\"BRAND\"]\n",
+    "\n",
+    "## Validation size\n",
+    "validation_size = 0.2\n",
+    "X_train, X_validation, y_train, y_validation = train_test_split(X, y, test_size=validation_size,\n",
+    "                                                                random_state=RANDOM_SEED)\n",
+    "\n",
+    "print(\"Training Size:- \", X_train.shape[0])\n",
+    "print(\"Validation Size:- \", X_validation.shape[0])\n",
+    "print(\"Test Size:- \", X_test.shape[0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "37ea9ddf",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "X_train = label_sentences(X_train[:10000], 'Train')\n",
+    "X_validation = label_sentences(X_validation[:10000], 'Validation')\n",
+    "X_test = label_sentences(X_test[:10000], 'Test')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "89f06db7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "all_data = X_train + X_test + X_validation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "66ceda55",
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "100%|██████████| 30000/30000 [00:00<00:00, 2857609.52it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1836385.29it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2106561.31it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2142757.01it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2125491.89it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2152654.61it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1998366.10it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2089004.88it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1902897.84it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1708219.00it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1785519.36it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1989456.11it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1591786.36it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2033306.19it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2109775.49it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2156750.20it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2059699.79it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2112254.62it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2206483.24it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2145716.72it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2071943.36it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1824774.06it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1809996.12it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1685655.42it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2116981.06it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2148464.49it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2113638.38it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2103708.56it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 1683850.82it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2158563.12it/s]\n",
+      "100%|██████████| 30000/30000 [00:00<00:00, 2144985.17it/s]\n"
+     ]
+    }
+   ],
+   "source": [
+    "model_dbow = Doc2Vec(dm=0, vector_size=300, negative=5, min_count=1, alpha=0.065, min_alpha=0.065)\n",
+    "model_dbow.build_vocab([x for x in tqdm(all_data)])\n",
+    "\n",
+    "for epoch in range(30):\n",
+    "    model_dbow.train(utils.shuffle([x for x in tqdm(all_data)]), total_examples=len(all_data), epochs=1)\n",
+    "    model_dbow.alpha -= 0.002\n",
+    "    model_dbow.min_alpha = model_dbow.alpha"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "f7768ff7",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "<ipython-input-10-ca2c6c4355f0>:13: DeprecationWarning: Call to deprecated `docvecs` (The `docvecs` property has been renamed `dv`.).\n",
+      "  vectors[i] = model.docvecs[prefix]\n"
+     ]
+    }
+   ],
+   "source": [
+    "def get_vectors(model, corpus_size, vectors_size, vectors_type):\n",
+    "    \"\"\"\n",
+    "    Get vectors from trained doc2vec model\n",
+    "    :param doc2vec_model: Trained Doc2Vec model\n",
+    "    :param corpus_size: Size of the data\n",
+    "    :param vectors_size: Size of the embedding vectors\n",
+    "    :param vectors_type: Training or Testing vectors\n",
+    "    :return: list of vectors\n",
+    "    \"\"\"\n",
+    "    vectors = np.zeros((corpus_size, vectors_size))\n",
+    "    for i in range(0, corpus_size):\n",
+    "        prefix = vectors_type + '_' + str(i)\n",
+    "        vectors[i] = model.docvecs[prefix]\n",
+    "    return vectors\n",
+    "    \n",
+    "train_vectors_dbow = get_vectors(model_dbow, len(X_train), 300, 'Train')\n",
+    "validation_vectors_dbow = get_vectors(model_dbow, len(X_validation), 300, 'Validation')\n",
+    "test_vectors_dbow = get_vectors(model_dbow, len(X_test), 300, 'Test')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "79b82e50",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/usr/local/lib/python3.8/dist-packages/sklearn/linear_model/_logistic.py:763: ConvergenceWarning: lbfgs failed to converge (status=1):\n",
+      "STOP: TOTAL NO. of ITERATIONS REACHED LIMIT.\n",
+      "\n",
+      "Increase the number of iterations (max_iter) or scale the data as shown in:\n",
+      "    https://scikit-learn.org/stable/modules/preprocessing.html\n",
+      "Please also refer to the documentation for alternative solver options:\n",
+      "    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression\n",
+      "  n_iter_i = _check_optimize_result(\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "LogisticRegression(C=100000.0, n_jobs=1)"
+      ]
+     },
+     "execution_count": 11,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "logreg = LogisticRegression(n_jobs=1, C=1e5)\n",
+    "logreg.fit(train_vectors_dbow, y_train[:10000])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "4fb1954a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "accuracy:-  38.95\n"
+     ]
+    }
+   ],
+   "source": [
+    "y_pred = logreg.predict(validation_vectors_dbow)\n",
+    "print(\"accuracy:- \", 100 * accuracy_score(y_pred, y_validation[:10000]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad285176",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.10"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
